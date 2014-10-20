@@ -1,0 +1,13 @@
+Assignment 6
+Ryan Casey
+5/9/14
+
+Just type 'make' to compile, and run ./Cuda1DFDWave [blockSize] [max # of blocks]
+to run.  For example, run ./Cuda1DFDWave 512 50
+(Note: The makefile is setup to compile on minuteman/polaris).
+
+This will produce raw numerical data for the wave at a few preset timesteps 
+in the /output directory.  Running the provided python script with 
+'python makePlots.py' will display the output in graphical form.
+We can verify that the CPU and GPU methods produce the same plots of the
+wave, but the GPU implementation runs must faster.

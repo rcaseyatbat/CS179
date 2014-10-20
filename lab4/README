@@ -1,0 +1,87 @@
+Assignment 4
+Ryan Casey
+5/1/14
+
+Just type 'make' to compile, and run ./frac3d to display the 4D Julia Fractal
+(Note: The makefile is setup to compile on minuteman)
+
+EXTRA CREDIT
+-----------------------------------------------------------------------------
+I attempted both extra credit components for this lab.
+
+1.) In d_render(), if the initial raytrace hit the object, we then raytrace
+back to the light source (that I hardcoded to be at position (1,1,1)).  If we
+hit something on our way to the light, then the initial position that we hit
+should be in the shadow, so I make the color slightly darker by multiplying 
+each color component by 0.8.
+
+2.) The code for this is in frac3d.cc, where I calculate the distance to the 
+camera based on the view matrix, and update the value of epsilon that we 
+pass into render().  If the distance is lower, the value of epsilon we pass 
+in is lower so we can see more details
+
+
+Prelab Questions:
+
+1.)
+------------------------------------------------------------------------------
+Considering the following snippet:
+long i = x + xDim * (y + yDim * z);
+long j = y + yDim * (x + xDim * z);
+
+The value i will be computed more efficiently than the value for j.  For i, 
+our threads will run along x, and thus we will be accessing memory that is in 
+order , aligned, and at addresses one after the other.  We get better access 
+rates when the memory is coalesced as such.  
+
+In calculating i, as x increases i is just incremented by 1 each time (until 
+x reaches xDim, then y increases and then we start increment x again, etc.).  
+Thus, we are looking to access consecutive memory locations, as i increases only
+1 at a time.
+
+But in calculating j, as x increases j increases by yDim (which in the case of
+this lab is 256).  Thus, we are accessing memory that is 256 locations apart
+each time, so the memory accesses are not together, and thus its slower to read.
+
+For this particular lab using the timing mechanism in recalculate, I found 
+that if we calculated the index as long i = x + xDim * (y + yDim * z), 
+recalculate took about 120 ms, while if we calculated the index as 
+long j = y + yDim * (x + xDim * z) it took about 140 ms, so this agrees with 
+the idea that continguous memory gives better memory access times and 
+runtimes.  
+
+
+2.)
+------------------------------------------------------------------------------
+We want to map from [0, 256] to [-2,2], and in particular determine what the points
+0, 256, and 100 map to on the [-2,2] scale.
+
+Let [min1, max1] = [0, 256] and [min2, max2] = [-2,2] and apply the formula
+
+x2 = (x1 - min1) * (max2 - min2) / (max1 - min1) + min2
+x2 = (x1 - 0) * (2 - (-2)) / (256-0) + (-2)
+x2 = (x1 * 4/256) - 2
+
+For x1 = 0:
+x2 = (0 * 4/256) - 2 = 0 - 2 = -2
+So the point 0 maps to -2 on the [-2, 2] scale.  This makes sense, since the 
+miniumum value on the first scale should correspond to the minimum value 
+on the second scale.
+
+For x1 = 256:
+x2 = (256 * 4/256) - 2
+x2 = 4 - 2 = 2
+So the point 256 maps to 2 on the [-2,2] scale.  This also makes sense, since the 
+maximum value on the first scale should correspond to the maximum value on the 
+second scale.
+
+For x1 = 100:
+x2 = (100 * 4 / 256) - 2
+x2 = 1.5625 - 2
+x2 = -0.4375
+So the point 100 maps to -0.4375 on the [-2,2] scale, which is also reasonable.
+
+So we have:
+0 maps to -2
+256 maps to 2
+ n100 maps to -0.4375

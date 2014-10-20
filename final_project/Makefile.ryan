@@ -1,0 +1,59 @@
+### CHANGE THESE LINES TO MATCH YOUR SYSTEM        ###
+### COMPILER PATH                                  ###
+CC = /usr/bin/g++
+### CUDA FOLDER PATH                               ###
+#CUDA_PATH       ?= /cs/courses/cs179/public_html/cuda-5.0
+CUDA_PATH       ?= /Developer/NVIDIA/CUDA-6.0
+# CUDA code generation flags
+#GENCODE_FLAGS   := -gencode arch=compute_20,code=sm_20
+GENCODE_FLAGS   := -gencode arch=compute_30,code=sm_30
+# this may need to be lib64
+CUDA_LIB_PATH   ?= $(CUDA_PATH)/lib
+LD_FLAGS = -framework OpenGl -framework GLUT -L/usr/X11R6/lib -L/usr/local/lib -lpng
+#LD_FLAGS = -framework OpenGl -framework GLUT -L/usr/X11R6/lib -lpng
+######################################################
+
+CUDA_INC_PATH   ?= $(CUDA_PATH)/include
+CUDA_BIN_PATH   ?= $(CUDA_PATH)/bin
+
+CC_INCLUDE =
+NVCC_INCLUDE = -I$(CUDA_PATH)/samples/common/inc
+
+# Common binaries
+NVCC            ?= $(CUDA_BIN_PATH)/nvcc
+
+# OS-specific build flags
+ifneq ($(UNAME),Darwin)
+      LDFLAGS   := -Xlinker -rpath $(CUDA_LIB_PATH) -L$(CUDA_LIB_PATH) -lcudart -lglew
+      CCFLAGS   := -arch $(OS_ARCH)
+else
+  ifeq ($(OS_SIZE),32)
+      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart -framework OpenGL -framework GLUT
+      CCFLAGS   := -m32
+  else
+      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart -framework OpenGL -framework GLUT
+      CCFLAGS   := -m64
+  endif
+endif
+
+# OS-architecture specific flags
+ifeq ($(OS_SIZE),32)
+      NVCCFLAGS := -m32
+else
+      NVCCFLAGS := -m64
+endif
+
+TARGETS = image_proc
+
+all: $(TARGETS)
+
+$(TARGETS): main.cc image_kernel.o
+	$(CC) $< -o $@ image_kernel.o -O3 -I$(CUDA_INC_PATH) $(CC_INCLUDE) $(LDFLAGS) $(LD_FLAGS) -Wall -Wno-deprecated-declarations
+
+image_kernel.o: image_kernel.cu
+	$(NVCC) $(NVCCFLAGS) -O3 $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) -I$(CUDA_INC_PATH) $(NVCC_INCLUDE) -o $@ -c $<
+
+clean:
+	rm -f *.o $(TARGETS)
+
+again: clean $(TARGETS)

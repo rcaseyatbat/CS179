@@ -1,0 +1,248 @@
+Final Project
+Ryan Casey
+5/27/14
+
+IMAGE PROCESSING - FINAL PROJECT
+
+Just type 'make' to compile, and run ./image_proc [N] to display a side-by-side
+comparison of an original .png file and a version that went through some sort
+of image processing on either the CPU or GPU (more on that below). N is an 
+optional argument that represents how many times to run the GPU algorithms 
+when computing average runtime.
+(Note: The Makefile is setup to compile on minuteman)
+
+DEPENDENCIES:
+This project requires OpenGL to display the processed images (I've based this 
+project off Lab 4).
+This project also requires libpng in order to read in the given .png image
+(I've hardcoded to use Lenna.png, but you should be able to use any .png). (I've
+based this off a similar assignment in CS 171 from fall term (Lab 6 I believe
+where we had to read in .png files for textures)).
+
+Both OpenGL and libpng are available on minuteman/polaris, and I've set up the
+Makefile so the project works there.  It you are on another machine it may
+require slight changes to the Makefile to get it to compile correctly.
+
+DESIGN QUESTIONS:
+1.) The GPU helps here when each pixel has to do an involved calculation.  
+Rather than running these calculations in series (which can potentially take
+a long time), we can run them in parallel, since the output of 1 pixel has 
+no effect on the calculation of other pixels.
+2.) 1 thread will calculation the new RGBA color for 1 pixel per kernel call.
+We can grab the (x,y) index based on the threadIdx, and do calculations based
+on the neighboring pixels.
+3.) For memory, I pass in the input image and output image to each kernel.  Each
+thread does a calculation based on the input image and updates the appropriate
+pixel in the output image.  (I let the output image original equal the input
+image, so that in some border cases around the edges I can just leave the pixel
+as it was originally)  Further, I utilized shared memory for my Blur Filter, 
+where each thread needs to use the same filter so it made sense to use shared
+memory rather than allocating space for the filter on each thread or reading
+from global memory.  However, I didn't use shared memory for the other 
+algorithms, since when we need to read the neighboring pixels, there is no 
+guarantee that the neighbor pixel is in the same shared memory block which 
+could cause problems.
+
+USAGE: ./image_proc [N]
+	(where N is an optional argument for how many times we should run the 
+	GPU algorithms to compute the average time. By default N = 1)
+	For example you can run:
+	./image_proc
+	./image_proc 10
+
+
+PROGRAM: The program displays 2 side-by-side images.  The one on the left is
+the original .png file we read in, while the right image is the result of our
+current image processing technique (on either the CPU or GPU).
+
+UI:
+By default, the program start in CPU mode (that is, it runs the image 
+processing algorithms on the CPU).
+Press 'g' to toggle to GPU mode so the image processing is done on the CPU
+with CUDA.
+Press 'c' to toggle to CPU mode so the image processing is done on the CPU
+in parallel.
+
+By default, the image on the right starts by simply displaying the original 
+.png file.
+
+(See below for further descriptions of the image processing techniques)
+Press '2' to display the inverted .png file on the right.
+Press '3' to display a rotated version of the .png file on the right. 
+Press '4' to display an image that shows all the edges in the original .png.
+Press '5' to display a blurred version of the .png
+Press '6' to display an "oil painting"-like version of the .png
+
+Press '1' to go back to displaying the original .png file on the right.
+
+Press '+' to increase the radius of pixels used in the filters for the blur
+	and oil painting algorithms. (Note that the maximum is set to 15 pixels, 
+	that is, we consider 15 pixels in all directions)
+Press '-' to decrease the radius of pixels used in the filters for the blur
+	and oil painting algorithms. (Note that the minimum is set to 1 pixels)
+
+Every time we display a new image, we compute how long the image processing 
+took with that technique and print this time out in the terminal, allowing us
+to compare the time for the GPU implementation of each algorithm vs the time
+for the CPU implementations, and we can see where CUDA drastically increases
+performance and where it doesn't.
+
+
+NOTES ABOUT IMAGE PROCESSING ALGORITHMS:
+1) Original - Just display original png. Don't do any processing.
+2) Invert - Simply grab the inverse of each RGBA bit from the original image
+3) Rotate - For each pixel, calculate the distance from the UV origin, and swirl
+ 		by increasing the angle from the UV origin by a factor relative to the 
+ 		distance.  Thus, it swirls more as we move away from the center.
+4) Edge Detection - For each pixel, consider the 8 surrounding pixels, and apply
+		the filter:
+		-1 -1 -1
+		-1  8 -1
+		-1 -1 -1
+		Note that this detects edges in all directions.  The resulting pixel is
+		black unless the average of the surround pixels is more than the 
+		original pixel in either the R, G, or B channels.
+5) Blur Filter - For each pixel, consider all pixels within some 'radius' in 
+		either the vertical or horizontal direction.  Use the filter:
+		1 1 1 ...
+		1 1 1 ...
+		1 1 1 ...
+		....
+		Note that this just averages all of the surrounding pixels within the
+		radius, thus giving us our blur effect
+6) Oil Paint - For each pixel, consider all pixels within some 'radius' in 
+		either the vertical or hozizontal direction.  Split the 256 possible 
+		pixel intensities into 10 'bins' of equal size. Compute the intensity of
+		all pixels within the radius, and find the most common bin.  Compute the
+		average R,G,B values of all pixels that were sorted into the most common
+		bin, and set the pixel to have those average values.
+
+MEMORY CONSIDERATIONS:
+For all of the GPU methods, I pass in the input image and the width and 
+height of the image to the kernel.
+
+Additionally, I utilized shared memory for the Blur Filter.  Since each pixel
+utilizes the same filter, it was easier/faster to use shared memory than 
+allocate memory for the filter on each individual thread.
+
+However, I didn't use shared memory in the other algorithms, since we need
+to consider neighboring pixels that may not be in the correct block of shared
+memory (since shared memory is per-block, if we needed to know the value of a
+pixel in a different block that would be bad).  It appears that using shared
+memory for the filter for the Blur was significant however (see below).
+
+BENCHMARKING: 
+The following times are averages I get on my machine (an iMac).  Results may 
+very on minuteman/polaris/other machines.
+Note that the CPU times hardly vary, so I just look at 1 iteration of the 
+algorithm, while GPU times tend to vary, so I've taken the average over 
+10 runs (that is, set N = 10 with ./image_proc 10).
+
+Method 1 (Original Image):
+CPU - 0.01 ms
+GPU - 0.016 ms
+We see that the GPU is slightly slower, probably due to the fact that I still
+cudaMemcpy the input image and output image (even though I don't do anything
+with the input, so this is probably unnecessary, but it makes such a small
+difference anyway).
+
+Method 2 (Invert image):
+CPU - 1.9 ms
+GPU - 0.75 ms
+The GPU has a speedup of about 2x.  The algorithm is so simple (it just inverts
+the bits of the RGB for each pixel), that it doesn't take the CPU long at all 
+to due the calculations, so the GPU doesn't actually perform too much better
+due to thread start up costs and the cost of the kernel call.
+(Actually if we let N = 1, the GPU takes about 2.5 ms which is actually slower, 
+again due to these start up costs, which are never made up for due to the
+simplicity of the algorithm)
+
+Method 3 (Rotate):
+CPU - 19.5 ms
+GPU - 5.1 ms
+Rotation requires more work to be done for each pixel, so by doing the work in
+parallel, the GPU sees a 4x improvement over the GPU.  We face the same start 
+up costs for the threads and kernel, but this time it is made up for by the 
+fact that the calculation for each pixel takes longer, so we gain more of an 
+advantage for doing the work in parallel.
+
+Method 4 (Edge Detection):
+CPU - 7.0 ms
+GPU - 1.2 ms
+Again the algorithm is slightly more involved (we need to do a calculation 
+based on the 8 neighboring pixels), so the GPU sees a 5x improvement in speed.
+I could have used shared memory here as well, but I left it as is to use as a
+comparison to the Blur Filter which does use shared memory.
+
+Method 5 (Blur):
+For radius = 1:
+	CPU - 9.7 ms
+	GPU - 1.05 ms
+For radius = 3:
+	CPU - 19.7 ms
+	GPU - 1.8 ms
+FOr radius = 7:
+	CPU - 77.8 ms
+	GPU - 5.95 ms
+For radius = 11:
+	CPU - 182 ms
+	GPU - 13.26 ms
+For radius = 15:
+	CPU - 328 ms
+	GPU = 17 ms
+We utilized shared memory here for the filter (which actually was probably
+unnecessary since I know the whole matrix is just 1's, but this way it is 
+more versatile in case other filters want to be used).  We see a dramatic
+increase in performance for the GPU as the radius goes up (as the radius goes 
+up, the calculation takes more time per thread since we are using the RGB
+values of r^2 pixels in each calculation).  We see up to a 20x speed increase
+with the GPU when the radius reaches a maximum of 15.
+
+Method 6 (Oil Paint):
+For radius = 1:
+	CPU - 23 ms
+	GPU - 24 ms
+For radius = 3:
+	CPU - 94 ms
+	GPU - 85 ms
+FOr radius = 7:
+	CPU - 388 ms
+	GPU - 372 ms
+For radius = 11:
+	CPU - 896 ms
+	GPU - 861 ms
+For radius = 15:
+	CPU - 1600 ms
+	GPU = 1553 ms
+Surprisingly, the GPU didn't show much of an improvement in the Oil Painting
+algorithm, even though the algorithm was the most complex.  At first I expected
+that the GPU would perform much better than the CPU, since the algorithm took
+the longest for each pixel.  But I think the issue here was that I had to 
+allocate so much memory on each thread (to keep track of all the intensities, I
+needed 4k bytes per thread).  I think this was too much memory to allocate for
+each thread on the GPU, and it ended up having to just do each calculation in 
+series anyway.  I don't think there was any easy way to reduce the memory
+required for each thread, so even though the GPU failed to perform any better, 
+I've decided to keep the algorithm as an example of where the GPU didn't work 
+well.
+
+CONCLUSION:
+I've used the GPU to accelerate the per-pixel calculations in various 
+image processing algorithms by having each thread work on a single pixel 
+in parallel.  In almost all cases, the GPU reported a significant speedup
+which would only be increased if we were working with a larger image.  The best
+example was the Blur Filter, in which the GPU reported up to a 20x speedup over
+the GPU when the blur radius was large.  By having the radius as a variable, it
+was pretty easy to show how important the GPU was.  In general, we see as the
+per-pixel algorithms, the GPU performed better since the CPU took longer to 
+do all the calculations in parallel - that is, until we got to the Oil Painting 
+algorithm, which simply required allocating too much memory on the device for 
+the GPU to be useful.
+
+
+
+
+
+
+
+

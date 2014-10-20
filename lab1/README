@@ -1,0 +1,98 @@
+Assignment 1
+Ryan Casey
+4/5/14
+
+Just type 'make' to compile, and run ./Main1
+(You may need to change the Compiler Path and Cuda Folder Path at the top
+of the Makefile.)
+
+Question (a)
+----------------------------------------------------------------------------
+i. This sample is correct.  Each of the methods of setting an element in the 
+array is valid, and thus this code produces the correct result with the third
+elements of each array (a[2], b[2], c[2], and d[2]) all equal to 5.
+
+ii. This sample is incorrect and does not compile.  int *a = 3 is setting
+a to point to the memory address 3, rather than the integer 3.  To fix this we
+could do the following, which would correctly set a to have a value of the 
+integer 3.
+
+    int *a;
+    a = new int;
+    *a = 3;
+    *a = *a + 2;
+    printf("%d",*a);
+
+iii. This code is incorrect and does not compile.  We are trying to set *a
+and *b to be integer pointers, but int* a,b; is actually making *a an integer
+pointer but *b a normal integer.  Then, we try to to assign an (int*) to an int
+for b, which results in a compiler error.  To fix this, we just need to 
+correctly make *b an integer pointer.
+
+    int *a, *b;
+    a = (int*) malloc(sizeof(int));
+    b = (int*) malloc(sizeof(int));
+
+    if (!(a && b)){
+        printf("Out of memory");
+        exit(-1);
+    }
+    *a = 2;
+    *b = 3;
+
+iv. This code is correct.  The (int*) malloc(1000) only applies to the *a 
+integer pointer, while i remains unititialized until the for loop, where we
+correctly loop through and access each element and assign the ith element to 
+be equal to i.
+
+v. This code is incorrect and results in an Illegal instruction error.  
+**a is a one dimensional array of pointers, but for each entry in that array, we need
+to make another one dimensional array of 100 integers.  
+
+    int **a = (int**) malloc(3*sizeof(int*));
+    for (int i = 0; i < 3; i++)  
+      a[i] = (int*) malloc(100*sizeof(int));  
+    a[1][1] = 5;
+
+vi. This code does not produce the correct result.  Instead of checking if 
+the value entered is equal to 0, it is checking if the memory location pointed
+to by a is equal to 0, which would indicate that we are out of memory.  To fix this:
+
+    int *a = (int*) malloc(sizeof(int));
+    scanf("%d",a);
+    if (!*a)
+        printf("Value is 0\n");  
+
+Question (e)
+------------------------------------------------------------------------------
+Number of Inputs      CPU time/Mutex time    CPU time/Linear time
+10^3                      0.04                    0.04
+10^4                      0.42                    0.51
+10^5                      3.10                    4.46
+10^6                      16.58                   18.64
+
+The results of the mutex accumulation and linear accumulation methods are both 
+very sensitive to the number of inputs values r.  We see that for 10^3 and 10^4
+inputs, just calculating the result on the CPU is faster than either of our
+implementations.  This is due to the fact that there is a large overhead for our
+GPU implementations in terms of setting up the inputs and outputs, allocating 
+memory on the host and GPU, and copying memory between the CPU and GPU. And there
+are so few inputs that we really don't gain that much benefit from having each 
+thread calculate a few P(r) values in parallel.  However, when we get up to 10^5
+and 10^6 inputs, the CPU starts to get slow since it is just evaluating each 
+element one at a time.  We see a big speedup when we use the GPU to evaluate
+inputs on many threads in parallel, and there are so many elements that it makes
+it worth the startup cost of creating so many threads.
+
+
+Concerning the differences in speedup factors between the mutex and linear methods, 
+the linear method starts to become faster than the mutex accumulation method. Using
+atomicAdd many times to add the partial_sums to the output results in excessive 
+serialization.  Every thread is trying to add to the same memory address, but to do 
+this safely with atomicAdd only one thread can do this at a time.  So we lose time, 
+since we have to wait for each thread to do the atomicAdd before the next one can 
+do the add.  However, in the linear accumulation method, we can sum of the results of
+all threads in a single block in parallel, meaning that we have to do far less
+atomicAdd calls, so the linear accumulation is significantly faster. 
+
+
